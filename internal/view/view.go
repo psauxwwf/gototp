@@ -60,18 +60,24 @@ func New() *View {
 }
 
 const (
-	_show   = "📒 show"
-	_code   = "🔑 code"
-	_add    = "🆕 add"
-	_delete = "❌ delete"
-	_export = "💾 export"
-	_import = "📥 import"
-	_change = "🔄 change"
+	_show     = "📒 show"
+	_code     = "🔑 code"
+	_withtime = "⏰ code for time"
+	_add      = "🆕 add"
+	_delete   = "❌ delete"
+	_export   = "💾 export"
+	_import   = "📥 import"
+	_change   = "🔄 change"
+)
+
+const (
+	timeFormat = "02.01.2006 15:04:05"
 )
 
 var mainopts = []huh.Option[string]{
 	huh.NewOption[string](_show, _show),
 	huh.NewOption[string](_code, _code),
+	huh.NewOption[string](_withtime, _withtime),
 	huh.NewOption[string](_add, _add),
 	huh.NewOption[string](_change, _change),
 	huh.NewOption[string](_delete, _delete),
@@ -143,6 +149,17 @@ func (v *View) SelectLocalFile(title string, suffix ...string) (string, error) {
 }
 
 func (v *View) Run() {
+	actionHandlers := map[string]func() error{
+		_show:     v.show,
+		_code:     v.code,
+		_withtime: v.withtime,
+		_add:      v.add,
+		_change:   v.change,
+		_delete:   v.delete,
+		_import:   v.importa,
+		_export:   v.export,
+	}
+
 	for {
 		var action string
 		form := SelectForm("🔐 gototp ", mainopts, &action)
@@ -153,47 +170,9 @@ func (v *View) Run() {
 			ErrorFunc(err)
 			continue
 		}
-		switch action {
-		case _show:
-			if err := v.show(); err != nil {
-				ErrorFunc(err)
-				continue
-			}
-		case _code:
-			if err := v.code(); err != nil {
-				ErrorFunc(err)
-				continue
-			}
-		case _add:
-			if err := v.add(); err != nil {
-				if errors.Is(err, huh.ErrUserAborted) {
-					continue
-				}
-				ErrorFunc(err)
-			}
-		case _change:
-			if err := v.change(); err != nil {
-				if errors.Is(err, huh.ErrUserAborted) {
-					continue
-				}
-				ErrorFunc(err)
-			}
-		case _delete:
-			if err := v.delete(); err != nil {
-				if errors.Is(err, huh.ErrUserAborted) {
-					continue
-				}
-				ErrorFunc(err)
-			}
-		case _import:
-			if err := v.importa(); err != nil {
-				if errors.Is(err, huh.ErrUserAborted) {
-					continue
-				}
-				ErrorFunc(err)
-			}
-		case _export:
-			if err := v.export(); err != nil {
+
+		if handler, exists := actionHandlers[action]; exists {
+			if err := handler(); err != nil {
 				if errors.Is(err, huh.ErrUserAborted) {
 					continue
 				}
