@@ -3,6 +3,7 @@ package view
 import (
 	"context"
 	"fmt"
+	"gototp/pkg/timeutil"
 	"time"
 
 	"github.com/charmbracelet/huh"
@@ -15,10 +16,10 @@ func (v *View) withtime() error {
 	form := huh.NewForm(
 		huh.NewGroup(
 			Input(
-				"time ", time.Now().Format(timeFormat),
+				"time ", timeutil.NowS(),
 				strValidator,
 				&input,
-				fmt.Sprint(time.Now().Format(timeFormat)),
+				timeutil.NowS(),
 			),
 		).WithTheme(base16),
 	)
@@ -26,17 +27,15 @@ func (v *View) withtime() error {
 		return err
 	}
 
-	with, err := time.Parse(timeFormat, input)
+	t, err := timeutil.Parse(input)
 	if err != nil {
-		return fmt.Errorf("error parsing time: %w", err)
+		return err
 	}
-
-	delta := time.Since(with)
-	fmt.Println(delta.Abs())
+	delta := time.Since(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	id, err := v.SelectCode(fmt.Sprintf("🔑 generate code with time %s", with.Format(timeFormat)))
+	id, err := v.SelectCode(fmt.Sprintf("🔑 generate code with time %s", timeutil.Format(t)))
 	if err != nil {
 		cancel()
 		return err
@@ -48,8 +47,6 @@ func (v *View) withtime() error {
 			case <-ctx.Done():
 				return
 			default:
-				fmt.Println(time.Now().Add(-delta).Format(timeFormat))
-
 				otpcode, err := key.GenCode(time.Now().Add(-delta))
 				if err != nil {
 					ErrorFunc(err)

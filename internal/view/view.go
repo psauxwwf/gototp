@@ -62,27 +62,23 @@ func New() *View {
 const (
 	_show     = "📒 show"
 	_code     = "🔑 code"
-	_withtime = "⏰ code for time"
 	_add      = "🆕 add"
 	_delete   = "❌ delete"
 	_export   = "💾 export"
 	_import   = "📥 import"
 	_change   = "🔄 change"
-)
-
-const (
-	timeFormat = "02.01.2006 15:04:05"
+	_withtime = "⏰ code for time"
 )
 
 var mainopts = []huh.Option[string]{
 	huh.NewOption[string](_show, _show),
 	huh.NewOption[string](_code, _code),
-	huh.NewOption[string](_withtime, _withtime),
 	huh.NewOption[string](_add, _add),
 	huh.NewOption[string](_change, _change),
 	huh.NewOption[string](_delete, _delete),
 	huh.NewOption[string](_export, _export),
 	huh.NewOption[string](_import, _import),
+	huh.NewOption[string](_withtime, _withtime),
 }
 
 var (
