@@ -1,0 +1,142 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+dotenv: ["build.env"]
+
+vars:
+  GOBIN: go
+  LDFLAGS: "-extldflags '-static' -w -s -buildid="
+  GCFLAGS: "all=-dwarf=false -l"
+  BIN: "{{.ROOT_DIR}}/bin"
+  APP: gototp
+  APP_BIN: "{{.BIN}}/{{.APP}}"
+  NDK_BIN: "{{.ROOT_DIR}}/android-ndk-r27/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+env:
+  CGO_ENABLED: "0"
+  GOARCH: amd64
+  GOEXPERIMENT: runtimesecret
+
+tasks:
+  setup:
+    desc: Set up the build directory
+    internal: true
+    silent: true
+    run: once
+    cmds:
+      - mkdir -p "{{.BIN}}"
+
+  build:
+    desc: Build Linux and Windows binaries
+    deps: [build:linux, build:windows]
+    cmds:
+      - task: crop
+
+  release:
+    desc: Build and publish Linux and Windows archives to GitHub (TAG=v1.2.3)
+    dir: "{{.ROOT_DIR}}"
+    requires:
+      vars: [TAG]
+    preconditions:
+      - sh: command -v gh
+        msg: Install GitHub CLI (gh) before publishing a release
+      - sh: gh auth status
+        msg: Authenticate with GitHub using gh auth login or GH_TOKEN
+    cmds:
+      - task: build
+      - task: zip
+      - >
+        gh release create "{{.TAG}}"
+        "{{.BIN}}/{{.APP}}_linux_amd64.tar.gz"
+        "{{.BIN}}/{{.APP}}_windows_amd64.tar.gz"
+        --title "{{.TAG}}"
+        --generate-notes
+
+  zip:
+    desc: Package Linux, Windows binaries
+    cmds:
+      - tar -czf "{{.BIN}}/{{.APP}}_linux_amd64.tar.gz" -C "{{.BIN}}" "{{.APP}}"
+      - tar -czf "{{.BIN}}/{{.APP}}_windows_amd64.tar.gz" -C "{{.BIN}}" "{{.APP}}.exe"
+
+  build:linux:
+    desc: Build for Linux amd64
+    dir: "{{.ROOT_DIR}}"
+    deps: [setup]
+    env:
+      GOOS: linux
+    cmds:
+      - >
+        {{.GOBIN}} build
+        -ldflags="{{.LDFLAGS}}"
+        -trimpath
+        -gcflags="{{.GCFLAGS}}"
+        -o "{{.APP_BIN}}"
+        ./cmd/{{.APP}}
+
+  build:windows:
+    desc: Build for Windows amd64
+    dir: "{{.ROOT_DIR}}"
+    deps: [setup]
+    env:
+      GOOS: windows
+    cmds:
+      - >
+        {{.GOBIN}} build
+        -ldflags="{{.LDFLAGS}}"
+        -trimpath
+        -gcflags="{{.GCFLAGS}}"
+        -o "{{.APP_BIN}}.exe"
+        ./cmd/{{.APP}}
+
+  build:darwin:
+    desc: Build for macOS amd64
+    dir: "{{.ROOT_DIR}}"
+    deps: [setup]
+    env:
+      GOOS: darwin
+    cmds:
+      - >
+        {{.GOBIN}} build
+        -ldflags="{{.LDFLAGS}}"
+        -trimpath
+        -gcflags="{{.GCFLAGS}}"
+        -o "{{.APP_BIN}}_darwin"
+        ./cmd/{{.APP}}
+
+  build:termux:
+    desc: Build for Termux arm64 using Android NDK r27
+    dir: "{{.ROOT_DIR}}"
+    deps: [setup]
+    # https://dl.google.com/android/repository/android-ndk-r27-linux.zip
+    env:
+      CGO_ENABLED: "1"
+      GOOS: android
+      GOARCH: arm64
+      CC: "{{.NDK_BIN}}/aarch64-linux-android24-clang"
+      CXX: "{{.NDK_BIN}}/aarch64-linux-android24-clang"
+    preconditions:
+      - sh: test -x "{{.NDK_BIN}}/aarch64-linux-android24-clang"
+        msg: Install Android NDK r27 in android-ndk-r27 before building for Termux
+    cmds:
+      - >
+        {{.GOBIN}} build
+        -ldflags="-w -s"
+        -trimpath
+        -gcflags="{{.GCFLAGS}}"
+        -o "{{.APP_BIN}}_termux"
+        ./cmd/{{.APP}}
+
+  crop:
+    internal: true
+    cmds:
+      - strip "{{.APP_BIN}}"
+      - strip "{{.APP_BIN}}.exe"
+      - objcopy --strip-unneeded "{{.APP_BIN}}"
+      - objcopy --strip-unneeded "{{.APP_BIN}}.exe"
+
+  dev:
+    desc: Rebuild when Go files change (requires entr)
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - find . -name "*.go" | entr -r task build

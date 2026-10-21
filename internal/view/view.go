@@ -34,21 +34,11 @@ type View struct {
 }
 
 func New() *View {
-	var passphrase string
-	form := PasswordForm(
-		"🔐 enter your secret", "",
-		strValidator,
-		&passphrase,
-	)
-	if err := form.Run(); err != nil {
-		if !errors.Is(err, huh.ErrUserAborted) {
-			ErrorFunc(err)
-		}
-		os.Exit(0)
-	}
-
-	_gototp, err := gototp.New(passphrase)
+	_gototp, err := unlock(readPassphrase)
 	if err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			os.Exit(0)
+		}
 		ErrorFunc(err)
 		os.Exit(1)
 	}

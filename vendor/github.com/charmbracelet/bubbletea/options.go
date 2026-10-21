@@ -19,7 +19,7 @@ type ProgramOption func(*Program)
 // cancelled it will exit with an error ErrProgramKilled.
 func WithContext(ctx context.Context) ProgramOption {
 	return func(p *Program) {
-		p.ctx = ctx
+		p.externalCtx = ctx
 	}
 }
 
@@ -185,6 +185,9 @@ func WithoutRenderer() ProgramOption {
 //
 // This feature is provisional, and may be changed or removed in a future version
 // of this package.
+//
+// Deprecated: this incurs a noticeable performance hit. A future release will
+// optimize ANSI automatically without the performance penalty.
 func WithANSICompressor() ProgramOption {
 	return func(p *Program) {
 		p.startupOptions |= withANSICompressor
